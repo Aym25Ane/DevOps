@@ -1,0 +1,70 @@
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  # Step 1: Checkout Code
+  - task: UseGitVersion@5
+    inputs:
+      versionSpec: '5.x'
+
+  # Step 2: Set up JDK for Java Backend
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '17'
+      jdkArchitecture: 'x64'
+
+  # Step 3: Build Java Jakarta Backend
+  - script: |
+      cd backend
+      mvn clean install
+    displayName: 'Build Backend'
+
+  # Step 4: Set up Node.js for React Frontend
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18'
+
+  # Step 5: Install Dependencies & Build React Frontend
+  - script: |
+      cd frontend
+      npm install
+      npm run build
+    displayName: 'Build Frontend'
+
+  # Step 6: Run Tests (JUnit for Java & Jest for React)
+  - script: |
+      cd backend
+      mvn test
+      cd ../frontend
+      npm test
+    displayName: 'Run Tests'
+
+  # Step 7: Build & Push Docker Images
+  - task: Docker@2
+    displayName: 'Build and Push Backend Image'
+    inputs:
+      command: 'buildAndPush'
+      repository: 'yourdockerhubusername/myapp-backend'
+      dockerfile: 'backend/Dockerfile'
+      containerRegistry: 'DockerHubServiceConnection'
+      tags: 'latest'
+
+  - task: Docker@2
+    displayName: 'Build and Push Frontend Image'
+    inputs:
+      command: 'buildAndPush'
+      repository: 'yourdockerhubusername/myapp-frontend'
+      dockerfile: 'frontend/Dockerfile'
+      containerRegistry: 'DockerHubServiceConnection'
+      tags: 'latest'
+
+  # Step 8: Deploy to Azure App Service (Optional)
+  - task: AzureWebApp@1
+    displayName: 'Deploy to Azure App Service'
+    inputs:
+      azureSubscription: 'your-azure-service-connection'
+      appName: 'your-azure-app-name'
+      package: '.'
